@@ -2,123 +2,45 @@
 <html>
 <head>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database.js"></script>
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
             background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             color: white; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: monospace;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
             padding: 20px;
         }
-        .container { 
-            max-width: 800px; 
-            width: 100%;
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        /* MOSTRAR ESTE CONTEÚDO APENAS PARA NAVEGADOR */
+        .protected-view {
+            text-align: center;
+            padding: 50px 20px;
+            display: none;
         }
-        h1 { 
-            color: #00ff88; 
-            font-size: 3rem; 
+        .protected-view h1 {
+            color: #ff0000;
+            font-size: 2.5rem;
             margin-bottom: 20px;
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
         }
-        .message { 
-            background: rgba(0, 0, 0, 0.5); 
-            padding: 30px; 
-            border-radius: 15px;
-            border: 2px solid #00ff88;
-            margin: 20px 0;
-            backdrop-filter: blur(10px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        }
-        .loader { 
-            background: rgba(0, 0, 0, 0.3); 
-            padding: 20px; 
+        .loader-code {
+            background: rgba(0,0,0,0.5);
+            padding: 20px;
             border-radius: 10px;
-            font-family: 'Courier New', monospace;
             margin: 20px 0;
-            word-break: break-all;
-            border: 1px solid rgba(0, 255, 136, 0.3);
-        }
-        code {
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px 15px;
-            border-radius: 5px;
-            display: block;
-            margin: 15px 0;
+            font-family: monospace;
             color: #00ff88;
-            font-size: 1.1rem;
-            border: 1px solid rgba(0, 255, 136, 0.2);
-        }
-        .logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .logo-icon {
-            font-size: 3rem;
-            color: #00ff88;
-        }
-        .badge {
-            display: inline-block;
-            background: rgba(0, 255, 136, 0.2);
-            color: #00ff88;
-            padding: 8px 15px;
-            border-radius: 20px;
-            margin: 10px 5px;
             border: 1px solid #00ff88;
-        }
-        .footer {
-            margin-top: 30px;
-            color: #888;
-            font-size: 0.9rem;
-        }
-        .protected-text {
-            font-size: 2rem;
-            color: #00ff88;
-            margin: 20px 0;
-            text-transform: uppercase;
-            letter-spacing: 3px;
-            font-weight: bold;
-            text-shadow: 0 0 10px #00ff88;
-        }
-        .status-indicator {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 10px 20px;
-            background: rgba(0, 255, 136, 0.1);
-            border-radius: 10px;
-            margin: 10px;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #00ff88;
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
     </style>
     <script>
-        // SUAS CREDENCIAIS FIREBASE
+        // Configuração Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyCMxnBTU9Z2lPzVia4tToyF_dKF2sS6DZ0",
             authDomain: "api-lol-guard-2f615.firebaseapp.com",
+            databaseURL: "https://api-lol-guard-2f615-default-rtdb.firebaseio.com",
             projectId: "api-lol-guard-2f615",
             storageBucket: "api-lol-guard-2f615.firebasestorage.app",
             messagingSenderId: "745922329728",
@@ -127,147 +49,87 @@
         
         // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        const database = firebase.database();
         
-        // Detectar se está sendo acessado por Roblox ou navegador
+        // Detectar se é Roblox
         function isRobloxRequest() {
-            // Verifica o User-Agent (Roblox usa HttpService)
-            const userAgent = navigator.userAgent || '';
-            return userAgent.includes('Roblox') || 
-                   userAgent.includes('HttpService') ||
+            const ua = navigator.userAgent.toLowerCase();
+            return ua.includes('roblox') || 
+                   ua.includes('httpservice') ||
                    window.location.search.includes('roblox=true');
         }
         
-        // Buscar script pelo ID
+        // Buscar script do Firebase
         async function getScript() {
-            const url = new URL(window.location.href);
-            const id = url.searchParams.get('id');
+            const urlParams = new URLSearchParams(window.location.search);
+            const scriptId = urlParams.get('id');
             
-            // Se não tiver ID, mostra mensagem padrão
-            if (!id) {
-                showProtectedPage('⚠️ ID não fornecido');
+            if (!scriptId) {
+                // Se não tem ID, mostra página protegida
+                showProtectedPage();
                 return;
             }
             
             try {
-                const doc = await db.collection('scripts').doc(id).get();
+                const snapshot = await database.ref('scripts/' + scriptId).once('value');
+                const scriptData = snapshot.val();
                 
-                if (doc.exists) {
-                    const scriptData = doc.data();
-                    
-                    // SE for Roblox → Retorna APENAS o SCRIPT ORIGINAL (sem HTML)
-                    if (isRobloxRequest()) {
-                        // Limpa completamente o body
-                        document.body.innerHTML = '';
-                        // Adiciona apenas o conteúdo do script
-                        document.body.textContent = scriptData.content;
-                    } 
-                    // SE for navegador normal → Mostra PÁGINA PROTEGIDA
-                    else {
-                        showProtectedPage(`✅ Script encontrado: ${scriptData.name || id}`, scriptData.content.length);
-                    }
-                    
-                } else {
-                    showProtectedPage('❌ Script não encontrado');
+                if (!scriptData) {
+                    showProtectedPage('Script não encontrado');
+                    return;
+                }
+                
+                // SE FOR ROBLOX → Retorna APENAS o código Lua
+                if (isRobloxRequest()) {
+                    document.body.textContent = scriptData.content;
+                } 
+                // SE FOR NAVEGADOR → Mostra mensagem protegida
+                else {
+                    showProtectedPage(`Script ID: ${scriptId}`);
                 }
                 
             } catch (error) {
                 console.error('Erro:', error);
-                showProtectedPage('🔥 Erro ao carregar script');
+                showProtectedPage('Erro ao carregar');
             }
         }
         
         // Mostrar página protegida
-        function showProtectedPage(message, scriptLength = 0) {
-            const currentUrl = window.location.href;
-            
+        function showProtectedPage(message = '') {
             const container = document.createElement('div');
-            container.className = 'container';
+            container.className = 'protected-view';
+            container.style.display = 'block';
             
             container.innerHTML = `
-                <div class="logo">
-                    <i class="fas fa-shield-alt logo-icon"></i>
-                    <h1>LOL GUARD</h1>
+                <h1>🔒 SCRIPT PROTEGIDO POR LOL GUARD</h1>
+                <p>Este script está protegido e não pode ser visualizado diretamente.</p>
+                ${message ? `<p><strong>${message}</strong></p>` : ''}
+                <div class="loader-code">
+                    <p>Para usar este script no Roblox:</p>
+                    <code>loadstring(game:HttpGet("${window.location.href}"))()</code>
                 </div>
-                
-                <div class="protected-text">
-                    <i class="fas fa-lock"></i> SCRIPT PROTEGIDO POR LOL GUARD
-                </div>
-                
-                <div class="message">
-                    <div class="status-indicator">
-                        <div class="status-dot"></div>
-                        <span>SISTEMA DE PROTEÇÃO ATIVO</span>
-                    </div>
-                    
-                    <h2><i class="fas fa-shield-halved"></i> Acesso Restrito</h2>
-                    <p>Este script está protegido pelo sistema avançado LOL GUARD.</p>
-                    
-                    ${message ? `<p style="margin: 15px 0; font-size: 1.2rem;"><strong>${message}</strong></p>` : ''}
-                    
-                    ${scriptLength ? `
-                        <div style="margin: 20px 0;">
-                            <span class="badge"><i class="fas fa-file-code"></i> ${scriptLength} caracteres</span>
-                            <span class="badge"><i class="fas fa-database"></i> Firebase</span>
-                            <span class="badge"><i class="fas fa-lock"></i> Criptografado</span>
-                        </div>
-                    ` : ''}
-                    
-                    <p style="margin-top: 20px; color: #aaa;">
-                        <i class="fas fa-exclamation-triangle"></i> 
-                        O conteúdo do script só pode ser acessado através do Roblox Executor
-                    </p>
-                </div>
-                
-                <div class="loader">
-                    <p><i class="fas fa-code"></i> Para executar este script no Roblox:</p>
-                    <code>loadstring(game:HttpGet("${currentUrl}"))()</code>
-                    <p style="color: #888; font-size: 0.9rem; margin-top: 10px;">
-                        Cole este código em qualquer executor compatível com Roblox
-                    </p>
-                </div>
-                
-                <div class="footer">
-                    <p>LOL GUARD v2.0 | Sistema de Proteção Anti-Cópia</p>
-                    <p style="margin-top: 5px; font-size: 0.8rem;">
-                        <i class="fas fa-fire"></i> Powered by Firebase
-                    </p>
-                </div>
+                <p style="color: #888; margin-top: 20px;">
+                    Sistema de proteção LOL GUARD v2.0
+                </p>
             `;
             
-            // Limpa o body e adiciona o container
             document.body.innerHTML = '';
             document.body.appendChild(container);
         }
         
-        // Executar quando carregar
+        // Iniciar
         window.onload = function() {
-            // Primeiro, verifica se o body já tem conteúdo de script
-            // (isso acontece quando o Roblox já acessou)
-            const bodyText = document.body.textContent.trim();
-            
-            // Se o body já contém código Lua, provavelmente já está servindo para Roblox
-            if (bodyText.includes('print') || 
-                bodyText.includes('game:') ||
-                bodyText.includes('function') ||
-                bodyText.includes('local') ||
-                bodyText.includes('=') && !bodyText.includes('<')) {
-                // Já está retornando script para Roblox, não faz nada
+            // Se já tem conteúdo Lua no body, não faz nada
+            const bodyText = document.body.textContent;
+            if (bodyText.includes('print') || bodyText.includes('game:')) {
                 return;
             }
             
-            // Se chegou aqui, é navegador normal → mostra página protegida
             getScript();
         };
     </script>
 </head>
 <body>
-    <!-- Conteúdo será inserido pelo JavaScript -->
-    <noscript>
-        <div style="padding: 20px; text-align: center;">
-            <h1>LOL GUARD</h1>
-            <p>JavaScript é necessário para acessar este sistema.</p>
-        </div>
-    </noscript>
+    <!-- Conteúdo será carregado dinamicamente -->
 </body>
 </html>
