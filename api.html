@@ -1,12 +1,41 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
-    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: white; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+        }
+        .container { max-width: 800px; }
+        h1 { color: #00ff88; font-size: 3rem; margin-bottom: 20px; }
+        .message { 
+            background: rgba(255,255,255,0.1); 
+            padding: 30px; 
+            border-radius: 15px;
+            border: 1px solid #00ff88;
+            margin: 20px 0;
+        }
+        .loader { 
+            background: rgba(0,0,0,0.3); 
+            padding: 20px; 
+            border-radius: 10px;
+            font-family: monospace;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+    </style>
     <script>
-        // SUAS CREDENCIAIS FIREBASE AQUI (MESMAS DO SEU SITE)
+        // SUAS CREDENCIAIS FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyCMxnBTU9Z2lPzVia4tToyF_dKF2sS6DZ0",
             authDomain: "api-lol-guard-2f615.firebaseapp.com",
@@ -20,38 +49,91 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         
-        // Função para servir scripts
-        async function serveScript() {
-            // Pegar ID da URL: api.html?id=abc123
-            const urlParams = new URLSearchParams(window.location.search);
-            const scriptId = urlParams.get('id');
+        // Detectar se está sendo acessado por Roblox ou navegador
+        function isRobloxRequest() {
+            // Verifica o User-Agent (Roblox usa HttpService)
+            const userAgent = navigator.userAgent || '';
+            return userAgent.includes('Roblox') || 
+                   userAgent.includes('HttpService') ||
+                   window.location.search.includes('roblox=true');
+        }
+        
+        // Buscar script pelo ID
+        async function getScript() {
+            const url = new URL(window.location.href);
+            const id = url.searchParams.get('id');
             
-            if (!scriptId) {
-                document.body.textContent = 'Erro: ID não fornecido';
+            // Se não tiver ID, mostra mensagem padrão
+            if (!id) {
+                showProtectedPage('ID não fornecido');
                 return;
             }
             
             try {
-                // Buscar script no Firestore
-                const doc = await db.collection('scripts').doc(scriptId).get();
+                const doc = await db.collection('scripts').doc(id).get();
                 
                 if (doc.exists) {
                     const scriptData = doc.data();
-                    // Retornar o código Lua puro
-                    document.body.textContent = scriptData.content;
+                    
+                    // SE for Roblox → Retorna o SCRIPT ORIGINAL
+                    if (isRobloxRequest()) {
+                        document.body.textContent = scriptData.content;
+                    } 
+                    // SE for navegador normal → Mostra PÁGINA PROTEGIDA
+                    else {
+                        showProtectedPage(`Script ID: ${id}`, scriptData.content.length);
+                    }
+                    
                 } else {
-                    document.body.textContent = 'Script não encontrado';
+                    showProtectedPage('Script não encontrado');
                 }
+                
             } catch (error) {
-                document.body.textContent = 'Erro ao carregar script';
+                showProtectedPage('Erro ao carregar');
             }
         }
         
+        // Mostrar página protegida
+        function showProtectedPage(message, scriptLength = 0) {
+            const container = document.createElement('div');
+            container.className = 'container';
+            
+            container.innerHTML = `
+                <h1>🛡️ LOL GUARD</h1>
+                <div class="message">
+                    <h2>Script Protegido</h2>
+                    <p>Este script está protegido pelo sistema LOL GUARD.</p>
+                    ${message ? `<p><strong>${message}</strong></p>` : ''}
+                    ${scriptLength ? `<p>Tamanho do script: ${scriptLength} caracteres</p>` : ''}
+                </div>
+                
+                <div class="loader">
+                    <p>Para usar este script, cole no Roblox Executor:</p>
+                    <code>loadstring(game:HttpGet("${window.location.href}"))()</code>
+                </div>
+                
+                <p style="margin-top: 30px; color: #aaa;">
+                    <i class="fas fa-shield-alt"></i> Acesso direto bloqueado
+                </p>
+            `;
+            
+            document.body.innerHTML = '';
+            document.body.appendChild(container);
+        }
+        
         // Executar quando carregar
-        window.onload = serveScript;
+        window.onload = function() {
+            // Se já estiver mostrando conteúdo (script para Roblox), não muda
+            if (document.body.textContent.includes('print') || 
+                document.body.textContent.includes('game:')) {
+                return; // Já está retornando script para Roblox
+            }
+            
+            getScript();
+        };
     </script>
 </head>
 <body>
-    <!-- O script Lua aparecerá aqui -->
+    <!-- Conteúdo será inserido pelo JavaScript -->
 </body>
 </html>
